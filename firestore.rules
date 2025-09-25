@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /timerStates/{userId} {
+      allow read: if request.auth != null 
+                        && request.auth.uid == userId
+      allow create, update: if request.auth != null 
+                        && request.auth.uid == userId
+                        && isValidTimerState();
+    }
+    
+    function isValidTimerState() {
+      let data = request.resource.data;
+      
+      return data.keys().hasAll(['currentSprint', 'startTimeT', 'sprintStats', 'lastUpdated'])
+      && (data.currentSprint == null 
+          || data.currentSprint in ['code', 'study', 'spirit', 'home', 'chaos'])
+      && data.startTimeT is number
+      && isValidSprintStats(data.sprintStats)
+      && data.lastUpdated is timestamp;
+    }
+    
+    function isValidSprintStats(stats) {
+      return stats.keys().hasAll(['code', 'study', 'spirit', 'home', 'chaos'])
+      && stats.code is number && stats.code >= 0
+      && stats.study is number && stats.study >= 0  
+      && stats.spirit is number && stats.spirit >= 0
+      && stats.home is number && stats.home >= 0
+      && stats.chaos is number && stats.chaos >= 0;
+      // No arbitrary limits - users can accumulate as much time as they want
+    }
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
